@@ -52,7 +52,7 @@ comma_to_period(Value) -> Value.
 message_headers(Req) ->
   {IP, _Port} = cowboy_req:peer(Req),
   [{<<"remote-ip">>, longstr, format_remote_ip(IP)},
-    {<<"x-amz-sns-message-type">>, longstr, cowboy_req:header(<<"x-amz-sns-message-type">>, Req, <<"">>)},
-    {<<"x-amz-sns-message-id">>, longstr, cowboy_req:header(<<"x-amz-sns-message-id">>, Req, <<"">>)},
-    {<<"x-amz-sns-subscription-arn">>, longstr, cowboy_req:header(<<"x-amz-sns-subscription-arn">>, Req, <<"">>)},
-    {<<"x-amz-sns-topic-arn">>, longstr, cowboy_req:header(<<"x-amz-sns-topic-arn">>, Req, <<"">>)}].
+   {<<"x-amz-sns-message-type">>, longstr, cowboy_req:header(<<"x-amz-sns-message-type">>, Req, <<"">>)},
+   {<<"x-amz-sns-message-id">>, longstr, cowboy_req:header(<<"x-amz-sns-message-id">>, Req, <<"">>)},
+   {<<"x-amz-sns-subscription-arn">>, longstr, cowboy_req:header(<<"x-amz-sns-subscription-arn">>, Req, <<"">>)},
+   {<<"x-amz-sns-topic-arn">>, longstr, cowboy_req:header(<<"x-amz-sns-topic-arn">>, Req, <<"">>)}].
