@@ -12,7 +12,17 @@
          allowed_methods/2,
          process_sns_payload/2]).
 
-dispatcher() -> [{"/sns", ?MODULE, []}].
+-record(state, {exchange}).
+
+dispatcher() ->
+  case is_enabled() of
+    true  ->
+      rabbit_log:info("rabbitmq-sns-plugin `/api/sns` endpoint publishing exchange: ~s", [get_exchange()]),
+      [{"/sns", ?MODULE, #state{exchange = get_exchange()}}];
+    false ->
+      rabbit_log:info("rabbitmq-sns-plugin `/api/sns` endpoint disabled"),
+      []
+  end.
 
 web_ui() -> [].
 
@@ -29,17 +39,17 @@ allowed_methods(ReqData, Context) ->
 process_sns_payload(Req, State) ->
   {ok, Body, _Req} = cowboy_req:read_body(Req),
   Message = rabbit_json:decode(Body),
-  Properties = #'P_basic'{app_id       = <<"rabbitmq-sns-plugin/0.0.0">>,
+  Properties = #'P_basic'{app_id       = <<"rabbitmq-sns-plugin">>,
                           content_type = <<"application/json">>,
                           headers      = message_headers(Req),
                           message_id   = maps:get(<<"MessageId">>, Message),
                           timestamp    = os:system_time(seconds),
                           type         = maps:get(<<"Type">>, Message)},
   Content = rabbit_basic:build_content(Properties, [Body]),
-  {ok, Msg} = rabbit_basic:message(rabbit_misc:r(<<"/">>, exchange, <<"aws.sns.messages">>),
+  {ok, Msg} = rabbit_basic:message(rabbit_misc:r(<<"/">>, exchange, State#state.exchange),
                                    maps:get(<<"TopicArn">>, Message),
                                    Content),
-  rabbit_basic:publish(rabbit_basic:delivery(true, true, Msg, undefined)),
+  rabbit_basic:publish(rabbit_basic:delivery(false, false, Msg, undefined)),
   {true, Req, State}.
 
 format_remote_ip(Address) ->
@@ -56,3 +66,16 @@ message_headers(Req) ->
    {<<"x-amz-sns-message-id">>, longstr, cowboy_req:header(<<"x-amz-sns-message-id">>, Req, <<"">>)},
    {<<"x-amz-sns-subscription-arn">>, longstr, cowboy_req:header(<<"x-amz-sns-subscription-arn">>, Req, <<"">>)},
    {<<"x-amz-sns-topic-arn">>, longstr, cowboy_req:header(<<"x-amz-sns-topic-arn">>, Req, <<"">>)}].
+
+
+is_enabled() ->
+  case application:get_env(rabbitmq_sns_plugin, notifications_enabled) of
+    undefined   -> true;
+    {ok, Value} -> Value
+  end.
+
+get_exchange() ->
+  case application:get_env(rabbitmq_sns_plugin, notifications_exchange) of
+    undefined   -> <<"aws.sns.notifications">>;
+    {ok, Value} -> Value
+  end.

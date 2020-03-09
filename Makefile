@@ -3,7 +3,8 @@ PROJECT_DESCRIPTION = RabbitMQ SNS Plugin
 
 define PROJECT_ENV
 [
-	{recv_exchange, <<"aws.sns.endpoint">>}
+	{notifications_enabled, true},
+	{notifications_exchange, <<"aws.sns.notifications">>}
 ]
 endef
 
