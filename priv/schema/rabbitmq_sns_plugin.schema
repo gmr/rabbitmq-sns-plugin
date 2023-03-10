@@ -6,7 +6,7 @@
   {datatype, string}
 ]}.
 
-{translation, "rabbitmq_sns_plugin.notification_exchange",
+{translation, "rabbitmq_sns_plugin.notifications_exchange",
   fun(Conf) ->
-    list_to_binary(cuttlefish:conf_get("sns_plugin.notification_exchange", Conf))
+    list_to_binary(cuttlefish:conf_get("sns_plugin.notifications_exchange", Conf))
   end}.
