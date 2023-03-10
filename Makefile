@@ -1,6 +1,12 @@
 PROJECT = rabbitmq_sns_plugin
 PROJECT_DESCRIPTION = RabbitMQ SNS Plugin
 
+RABBITMQ_VERSION ?= v3.11.x
+
+define PROJECT_APP_EXTRA_KEYS
+	{broker_version_requirements, ["3.11.0"]}
+endef
+
 define PROJECT_ENV
 [
 	{notifications_enabled, true},
