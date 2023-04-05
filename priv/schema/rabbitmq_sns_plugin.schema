@@ -1,0 +1,7 @@
+{mapping, "sns_plugin.notifications_enabled", "rabbitmq_sns_plugin.notifications_enabled", [
+  {datatype, {enum, [true, false]}}
+]}.
+
+{mapping, "sns_plugin.notifications_exchange", "rabbitmq_sns_plugin.notifications_exchange", [
+  {datatype, string}
+]}.
