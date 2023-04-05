@@ -77,5 +77,5 @@ is_enabled() ->
 get_exchange() ->
   case application:get_env(rabbitmq_sns_plugin, notifications_exchange) of
     undefined   -> <<"aws.sns.notifications">>;
-    {ok, Value} -> Value
+    {ok, Value} -> list_to_binary(Value)
   end.
