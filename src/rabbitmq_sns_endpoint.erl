@@ -1,7 +1,6 @@
 -module(rabbitmq_sns_endpoint).
 
--include_lib("rabbit_common/include/rabbit.hrl").
--include_lib("rabbit_common/include/rabbit_framing.hrl").
+-include_lib("amqp_client/include/amqp_client.hrl").
 
 -behaviour(rabbit_mgmt_extension).
 
@@ -39,18 +38,58 @@ allowed_methods(ReqData, Context) ->
 process_sns_payload(Req, State) ->
   {ok, Body, _Req} = cowboy_req:read_body(Req),
   Message = rabbit_json:decode(Body),
-  Properties = #'P_basic'{app_id       = <<"rabbitmq-sns-plugin">>,
-                          content_type = <<"application/json">>,
-                          headers      = message_headers(Req),
-                          message_id   = maps:get(<<"MessageId">>, Message),
-                          timestamp    = os:system_time(seconds),
-                          type         = maps:get(<<"Type">>, Message)},
-  Content = rabbit_basic:build_content(Properties, [Body]),
-  {ok, Msg} = rabbit_basic:message(rabbit_misc:r(<<"/">>, exchange, State#state.exchange),
-                                   maps:get(<<"TopicArn">>, Message),
-                                   Content),
-  rabbit_basic:publish(rabbit_basic:delivery(false, false, Msg, undefined)),
-  {true, Req, State}.
+  
+  % Establish a connection to the local RabbitMQ server
+  % Using custom connection parameters for port 5671 (TLS)
+  Params = #amqp_params_network{
+    username = <<"guest">>,
+    password = <<"guest">>,
+    port = 5671,
+    ssl_options = [
+      {verify, verify_none},
+      {fail_if_no_peer_cert, false}
+    ]
+  },
+  ConnectionResult = amqp_connection:start(Params),
+  case ConnectionResult of
+    {ok, Connection} ->
+      ChannelResult = amqp_connection:open_channel(Connection),
+      case ChannelResult of
+        {ok, Channel} ->
+          % Build the AMQP message properties
+          Props = #'P_basic'{
+            app_id = <<"rabbitmq-sns-plugin">>,
+            content_type = <<"application/json">>,
+            content_encoding = <<"UTF-8">>,
+            headers = message_headers(Req),
+            message_id = maps:get(<<"MessageId">>, Message, undefined),
+            timestamp = os:system_time(seconds),
+            type = maps:get(<<"Type">>, Message, undefined)
+          },
+          
+          % Create the publish command 
+          Publish = #'basic.publish'{
+            exchange = State#state.exchange,
+            routing_key = maps:get(<<"TopicArn">>, Message, <<"">>)
+          },
+          
+          % Create and publish the AMQP message
+          AmqpMessage = #amqp_msg{props = Props, payload = Body},
+          amqp_channel:cast(Channel, Publish, AmqpMessage),
+          
+          % Clean up - close the channel and connection
+          amqp_channel:close(Channel),
+          amqp_connection:close(Connection),
+          
+          {true, Req, State};
+        _ChannelError ->
+          rabbit_log:error("Failed to open channel: ~p", [ChannelResult]),
+          {false, Req, State}
+      end;
+    _ConnectionError ->
+      rabbit_log:error("Failed to connect to RabbitMQ: ~p", [ConnectionResult]),
+      {false, Req, State}
+  end.
 
 format_remote_ip(Address) ->
   [[123, Value, 125]] = io_lib:format("~p", [Address]),
@@ -66,7 +105,6 @@ message_headers(Req) ->
    {<<"x-amz-sns-message-id">>, longstr, cowboy_req:header(<<"x-amz-sns-message-id">>, Req, <<"">>)},
    {<<"x-amz-sns-subscription-arn">>, longstr, cowboy_req:header(<<"x-amz-sns-subscription-arn">>, Req, <<"">>)},
    {<<"x-amz-sns-topic-arn">>, longstr, cowboy_req:header(<<"x-amz-sns-topic-arn">>, Req, <<"">>)}].
-
 
 is_enabled() ->
   case application:get_env(rabbitmq_sns_plugin, notifications_enabled) of
