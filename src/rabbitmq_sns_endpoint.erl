@@ -39,16 +39,9 @@ process_sns_payload(Req, State) ->
   {ok, Body, _Req} = cowboy_req:read_body(Req),
   Message = rabbit_json:decode(Body),
   
-  % Establish a connection to the local RabbitMQ server
-  % Using custom connection parameters for port 5671 (TLS)
-  Params = #amqp_params_network{
-    username = <<"guest">>,
-    password = <<"guest">>,
-    port = 5671,
-    ssl_options = [
-      {verify, verify_none},
-      {fail_if_no_peer_cert, false}
-    ]
+  % Use direct connection since we're running inside RabbitMQ
+  Params = #amqp_params_direct{
+    virtual_host = <<"/">>
   },
   ConnectionResult = amqp_connection:start(Params),
   case ConnectionResult of
